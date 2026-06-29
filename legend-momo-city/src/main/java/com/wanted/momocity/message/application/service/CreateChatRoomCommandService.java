@@ -6,6 +6,7 @@ import com.wanted.momocity.friend.infrastructure.persistence.FriendJpaEntity;
 
 import com.wanted.momocity.friend.user.UserWithFMJpaEntity;
 import com.wanted.momocity.global.domain.common.exception.DomainRuleViolationException;
+import com.wanted.momocity.message.application.metric.MessageMetrics;
 import com.wanted.momocity.message.application.policy.MessageEligibilityPolicy;
 import com.wanted.momocity.message.application.usecase.CreateChatRoomCommandUseCase;
 import com.wanted.momocity.message.domain.repository.MessageRepository;
@@ -32,6 +33,7 @@ public class CreateChatRoomCommandService implements CreateChatRoomCommandUseCas
     private final MessageEligibilityPolicy messageEligibilityPolicy;
     private final SpringDataMessageRepository springDataMessageRepository;
     private final SpringDataChatRoomMemberRepository springDataChatRoomMemberRepository;
+    private final MessageMetrics messageMetrics;
 
     //채팅방 조회 및 개설
     @Override
@@ -57,11 +59,16 @@ public class CreateChatRoomCommandService implements CreateChatRoomCommandUseCas
 
         Long finalRoomId = null;
 
+
         //1차 검증: 두 유저가 채팅방 멤버에 같이 있는 채팅방이 있는지 조회
         //어댑터 포트를 통해 두 유저가 있는 기존 채팅방이 존재하는지 검증
         Optional<Long> existingRoomIdOpt = messageRepository.findExistingRoom(userId, targetUserId);
         if (existingRoomIdOpt.isPresent()) {
             log.info("[CreateChatRoomCommandService] 1차 멤버 검증 성공 - 양방향 활성화된 채팅방 발견. 기존 방ID: {}", existingRoomIdOpt.get());
+
+            // 🎯 딱 한 줄: 기존 방 조회 완료 시점에도 멤버 수(2명) 분포 기록
+            messageMetrics.recordRoomMemberCount(2.0);
+
             finalRoomId = existingRoomIdOpt.get();
         } else {
             //2차 검증: 로그인한 사용자가 나갔을 때 혼자 남은 방 중 과거 대화 역추적
@@ -103,6 +110,11 @@ public class CreateChatRoomCommandService implements CreateChatRoomCommandUseCas
 
         //기존 방 찾았다면 리턴
         if (finalRoomId != null) {
+
+            // 🎯 딱 두 줄: 재입장 특수 트래픽 발생 카운트 증가 + 복구 방 멤버 수(2명) 기록
+            messageMetrics.incrementChatReenterCount();
+            messageMetrics.recordRoomMemberCount(2.0);
+
             return new CreateRoomView(
                     true,
                     finalRoomId,
@@ -131,6 +143,7 @@ public class CreateChatRoomCommandService implements CreateChatRoomCommandUseCas
         messageRepository.saveChatRoomMember(targetMembership);
 
         log.info("[CreateChatRoomCommandService] 신규 채팅방 개설 완료 - 방ID: {}", newRoom.getId());
+
 
         return new CreateRoomView(
                 false,
