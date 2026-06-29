@@ -51,13 +51,15 @@ public class LearningHistory {
     *  progressRate = watchedSeconds / durationSec * 100
     * */
 
-    public void updateProgress (
+    public boolean updateProgress (
             // 현재 재생 위치
             int playbackSeconds, int durationSec
     ) {
         // watchedSeconds 업데이트
-        if (playbackSeconds > this.watchedSeconds
-                && playbackSeconds - this.watchedSeconds <= 10) {
+        boolean hasMeaningfulProgress = playbackSeconds > this.watchedSeconds
+                && playbackSeconds - this.watchedSeconds <= 10;
+
+        if (hasMeaningfulProgress) {
             this.watchedSeconds = playbackSeconds;
         }
 
@@ -68,6 +70,9 @@ public class LearningHistory {
         if (this.progressRate >= 100) {
             this.progressRate = 100;
         }
+
+        return hasMeaningfulProgress;
+
     }
 
     /*
