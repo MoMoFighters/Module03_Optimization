@@ -12,6 +12,7 @@ import com.wanted.momocity.viewing.domain.model.Chapter;
 import com.wanted.momocity.viewing.domain.model.LearningHistory;
 import com.wanted.momocity.viewing.domain.model.Lecture;
 import com.wanted.momocity.viewing.domain.repository.LearningHistoryRepository;
+import com.wanted.momocity.viewing.infrastructure.metrics.ViewingMetrics;
 import com.wanted.momocity.viewing.presentation.api.response.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ public class ViewingQueryService implements ViewingQueryUseCase {
     private final LearningHistoryRepository learningHistoryRepository;
     private final EnrollmentAccessPolicy enrollmentAccessPolicy;
     private final SequentialAccessPolicy sequentialAccessPolicy;
+    private final ViewingMetrics viewingMetrics;
 
     @Override
     public StreamingUrlResponse getStreamingUrl(Long userId, Long lectureId, Long chapterId) {
@@ -62,7 +64,9 @@ public class ViewingQueryService implements ViewingQueryUseCase {
         sequentialAccessPolicy.ensureSequentialAccess(userId, lectureId, chapterId);  // ← 추가
 
         // S3 Presigned URL 발급
-        String presignedUrl = s3Port.generatePresignedUrl(chapter.getVideoUrl());
+        String presignedUrl = viewingMetrics.getS3PresignedUrlTimer().record(
+                () -> s3Port.generatePresignedUrl(chapter.getVideoUrl())
+        );
 
         log.info("[Viewing] S3 Presigned URL 발급 완료 | userId={}, lectureId={}, chapterId={}",
                 userId, lectureId, chapterId);
