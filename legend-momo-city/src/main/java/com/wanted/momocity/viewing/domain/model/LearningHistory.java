@@ -37,29 +37,27 @@ public class LearningHistory {
 
     // 진척도 업데이트
     /*
-    * comment.
-    *  1. playbackSeconds > watchedSeconds → 앞으로 진행
-    *    AND playbackSeconds - watchedSeconds <= 10 -> 정상 시청 범위
-    *    -> watchedSeconds = playbackSeconds
-    *  -
-    *  2. playbackSeconds < watchedSeconds -> 뒤로 감기
-    *    -> watchedSeconds 업데이트 안 함
-    *  -
-    *  3. playbackSeconds - watchedSeconds > 10 -> 앞으로 당기기
-    *    -> watchedSeconds 업데이트 안 함
-    *  -
-    *  progressRate = watchedSeconds / durationSec * 100
-    * */
+     * comment.
+     *  1. playbackSeconds > watchedSeconds → 앞으로 진행
+     *    AND playbackSeconds - watchedSeconds <= 10 -> 정상 시청 범위
+     *    -> watchedSeconds = playbackSeconds
+     *  -
+     *  2. playbackSeconds < watchedSeconds -> 뒤로 감기
+     *    -> watchedSeconds 업데이트 안 함
+     *  -
+     *  3. playbackSeconds - watchedSeconds > 10 -> 앞으로 당기기
+     *    -> watchedSeconds 업데이트 안 함
+     *  -
+     *  progressRate = watchedSeconds / durationSec * 100
+     * */
 
-    public boolean updateProgress (
+    public void updateProgress (
             // 현재 재생 위치
             int playbackSeconds, int durationSec
     ) {
         // watchedSeconds 업데이트
-        boolean hasMeaningfulProgress = playbackSeconds > this.watchedSeconds
-                && playbackSeconds - this.watchedSeconds <= 10;
-
-        if (hasMeaningfulProgress) {
+        if (playbackSeconds > this.watchedSeconds
+                && playbackSeconds - this.watchedSeconds <= 10) {
             this.watchedSeconds = playbackSeconds;
         }
 
@@ -70,17 +68,14 @@ public class LearningHistory {
         if (this.progressRate >= 100) {
             this.progressRate = 100;
         }
-
-        return hasMeaningfulProgress;
-
     }
 
     /*
-    * comment.
-    *  playbackSeconds >= durationSec * 0.9 시 챕터 완료 처리
+     * comment.
+     *  playbackSeconds >= durationSec * 0.9 시 챕터 완료 처리
      * -> isCompleted = true
      * -> progressRate = 100
-    * */
+     * */
 
     // 챕터 완료처리
     public void complete (int durationSec) {
