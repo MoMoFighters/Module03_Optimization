@@ -26,6 +26,7 @@ public class EnrollmentMetricsAop {
         Timer.Sample sample = Timer.start(meterRegistry);
         String service = joinPoint.getSignature().getDeclaringType().getSimpleName();
         String method = ((MethodSignature) joinPoint.getSignature()).getMethod().getName();
+        MetricSpec metricSpec = resolveMetricSpec(service, method);
         String outcome = SUCCESS;
         String exception = NONE;
 
@@ -36,14 +37,30 @@ public class EnrollmentMetricsAop {
             exception = throwable.getClass().getSimpleName();
             throw throwable;
         } finally {
-            record(sample, service, method, outcome, exception);
+            record(sample, service, method, metricSpec, outcome, exception);
         }
+    }
+
+    private MetricSpec resolveMetricSpec(String service, String method) {
+        if ("EnrollmentCommandService".equals(service)
+                && "createEnrollment".equals(method)) {
+            return new MetricSpec(
+                    "momocity.enrollment.create",
+                    "수강신청 소요 시간"
+            );
+        }
+
+        return new MetricSpec(
+                "momocity.enrollment.service",
+                "수강신청 서비스 메서드 소요 시간"
+        );
     }
 
     private void record(
             Timer.Sample sample,
             String service,
             String method,
+            MetricSpec metricSpec,
             String outcome,
             String exception
     ) {
@@ -54,17 +71,23 @@ public class EnrollmentMetricsAop {
                 "exception", exception
         };
 
-        Timer timer = Timer.builder("momocity.enrollment.service.duration")
-                .description("Enrollment service method duration")
+        Timer timer = Timer.builder(metricSpec.name() + ".duration")
+                .description(metricSpec.description())
                 .tags(tags)
                 .register(meterRegistry);
 
         sample.stop(timer);
 
-        Counter.builder("momocity.enrollment.service.invocations")
-                .description("Enrollment service method invocation count")
+        Counter.builder(metricSpec.name() + ".invocations")
+                .description(metricSpec.description() + " 호출 횟수")
                 .tags(tags)
                 .register(meterRegistry)
                 .increment();
+    }
+
+    private record MetricSpec(
+            String name,
+            String description
+    ) {
     }
 }
