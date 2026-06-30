@@ -13,6 +13,7 @@ import com.wanted.momocity.user.domain.exception.InvalidReasonException;
 import com.wanted.momocity.user.domain.model.Role;
 import com.wanted.momocity.user.domain.model.Status;
 import com.wanted.momocity.user.domain.repository.UserRepository;
+import com.wanted.momocity.user.infrastructure.metrics.UserMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,11 +31,13 @@ public class UserCommandService implements UserCommandUsecase {
     private final UserPolicy userPolicy;
     private final PasswordEncodePort passwordEncodePort;
     private final UserEmailSendPort userEmailSendPort;
+    private final UserMetrics userMetrics;
 
     @Override
     public String registerNickname(NicknameRegisterCommand command) {
         userPolicy.nicknamePolicy(command.nickname());
         userRepository.registerNickname(command.userId(), command.nickname());
+        userMetrics.recordNicknameRegister();
         log.info("[user] 닉네임 등록 완료 | userId={} | nickname={}", command.userId(), command.nickname());
         return command.nickname();
     }

@@ -19,6 +19,13 @@ public class MomoMetrics {
     private final Timer chatRoomListTimer;
     private final Timer lectureUploadTimer;
     private final Timer lectureListTimer;
+    private final Timer authLoginTimer;
+    private final Timer userDetailTimer;
+    private final Timer userUpdateTimer;
+    private final Timer teacherApplicationListTimer;
+    private final Timer teacherApplicationDetailTimer;
+    private final Timer adminUserListTimer;
+
 
     // ===== Counter =====
     private final Counter s3UploadFailCounter;
@@ -78,6 +85,35 @@ public class MomoMetrics {
                 .description("S3 파일 업로드 실패 횟수")
                 .register(meterRegistry);
 
+        // Timer : 로그인 소요 시간
+        this.authLoginTimer = Timer.builder("momocity.auth.login.duration")
+                .description("로그인 소요 시간 - AuthenticationManager + Redis 저장 포함")
+                .register(meterRegistry);
+
+        // Timer
+        this.userDetailTimer = Timer.builder("momocity.user.detail.duration")
+                .description("마이페이지 조회 소요 시간")
+                .register(meterRegistry);
+
+        // Timer
+        this.userUpdateTimer = Timer.builder("momocity.user.update.duration")
+                .description("유저 정보 수정 소요 시간")
+                .register(meterRegistry);
+
+        // Timer
+        this.teacherApplicationListTimer = Timer.builder("momocity.teacher.application.list.duration")
+                .description("대기 강사 목록 조회 소요 시간")
+                .register(meterRegistry);
+
+        // Timer
+        this.teacherApplicationDetailTimer = Timer.builder("momocity.teacher.application.detail.duration")
+                .description("강사 신청 상세 조회 소요 시간")
+                .register(meterRegistry);
+
+        // Timer
+        this.adminUserListTimer = Timer.builder("momocity.admin.user.list.duration")
+                .description("관리자 회원 목록 조회 소요 시간 - Redis 캐싱 전후 비교")
+                .register(meterRegistry);
     }
 
     // 작업 시작 시점의 시간을 기억
@@ -133,5 +169,18 @@ public class MomoMetrics {
         sample.stop(lectureListTimer);
     }
 
+    // 로그인 소요 시간 기록
+    public void stopAuthLoginTimer(Timer.Sample sample) {
+        sample.stop(authLoginTimer);
+    }
 
+    public void stopUserDetailTimer(Timer.Sample sample) { sample.stop(userDetailTimer); }
+
+    public void stopUserUpdateTimer(Timer.Sample sample) { sample.stop(userUpdateTimer); }
+
+    public void stopTeacherApplicationListTimer(Timer.Sample sample) { sample.stop(teacherApplicationListTimer); }
+
+    public void stopTeacherApplicationDetailTimer(Timer.Sample sample) { sample.stop(teacherApplicationDetailTimer); }
+
+    public void stopAdminUserListTimer(Timer.Sample sample) { sample.stop(adminUserListTimer); }
 }

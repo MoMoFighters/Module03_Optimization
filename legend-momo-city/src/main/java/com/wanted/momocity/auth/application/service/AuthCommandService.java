@@ -11,6 +11,7 @@ import com.wanted.momocity.auth.domain.model.User;
 import com.wanted.momocity.auth.domain.model.UserOauth;
 import com.wanted.momocity.auth.domain.repository.UserOauthRepository;
 import com.wanted.momocity.auth.domain.repository.UserRepository;
+import com.wanted.momocity.auth.infrastructure.metrics.AuthMetrics;
 import com.wanted.momocity.auth.presentation.api.response.EmailSendResponse;
 import com.wanted.momocity.auth.presentation.api.response.LoginResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +56,8 @@ public class AuthCommandService implements AuthCommandUsecase {
     private final UpdatePasswordPort updatePasswordPort;
     private final PasswordEncodePort passwordEncodePort;
 
+    private final AuthMetrics authMetrics;
+
     private static final long EXPIRES_IN_SECONDS = 180L; // 임시 비번 만료시간 3분
 
 
@@ -65,7 +68,7 @@ public class AuthCommandService implements AuthCommandUsecase {
             OAuthClientPort googleOAuthClientPort,
             UserRepository userRepository,
             UserOauthRepository userOauthRepository, PasswordEncoder passwordEncoder, BlacklistPort blacklistPort, AuthenticationManager authenticationManager,
-            TokenProviderPort tokenProviderPort, ApplicationEventPublisher eventPublisher, RedisRefreshTokenPort redisRefreshTokenPort, EmailCodePort emailCodePort, EmailSendPort emailSendPort, UpdatePasswordPort updatePasswordPort, PasswordEncodePort passwordEncodePort
+            TokenProviderPort tokenProviderPort, ApplicationEventPublisher eventPublisher, RedisRefreshTokenPort redisRefreshTokenPort, EmailCodePort emailCodePort, EmailSendPort emailSendPort, UpdatePasswordPort updatePasswordPort, PasswordEncodePort passwordEncodePort, AuthMetrics authMetrics
     ) {
         this.loadUserPort = loadUserPort;
         this.signupPolicy = signupPolicy;
@@ -78,6 +81,7 @@ public class AuthCommandService implements AuthCommandUsecase {
         this.emailSendPort = emailSendPort;
         this.updatePasswordPort = updatePasswordPort;
         this.passwordEncodePort = passwordEncodePort;
+        this.authMetrics = authMetrics;
         this.oAuthClientPorts = Map.of(
                 "KAKAO", kakaoOAuthClientPort,
                 "GOOGLE", googleOAuthClientPort
@@ -137,7 +141,10 @@ public class AuthCommandService implements AuthCommandUsecase {
 
         // email로 유저 먼저 조회해서 id 꺼내기
         User user = loadUserPort.findByEmail(command.email())
-                .orElseThrow(() -> new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다."));
+                .orElseThrow(() -> {
+                    authMetrics.recordLoginFailed("user_not_found");
+                    return new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
+                });
 
         // 이메일/비밀번호로 사용자 인증
         Authentication authentication;
@@ -147,6 +154,7 @@ public class AuthCommandService implements AuthCommandUsecase {
             );
 
         }catch (BadCredentialsException e){
+            authMetrics.recordLoginFailed("bad_credentials");
             log.warn("[login] 로그인 실패 | email={} | 사유= 인증 실패", command.email());
             throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
@@ -159,10 +167,12 @@ public class AuthCommandService implements AuthCommandUsecase {
                 case BANNED -> "정지된 계정입니다.";
                 default -> "해당 계정은 현재 로그인이 불가능한 상태입니다.";
             };
+            authMetrics.recordLoginInactive(user.getStatus().name());
             throw new InactiveUserException(message, user.getStatus());
         }
 
         if (user.getIsTempPwd() && !emailCodePort.isTempPasswordVerified(command.email())) {
+            authMetrics.recordLoginFailed("temp_pwd_expired");
             throw new TempPasswordExpiredException("임시 비밀번호가 만료되었습니다. 다시 발급해주세요.");
         }
 

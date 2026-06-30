@@ -43,39 +43,39 @@ public class MetricsAop {
 
     // 메시지 내역 조회 소요 시간 측정
     // 기존 : 171ms, SQL 14개, N+1 확인
-    @Around("execution(* com.wanted.momocity.message.application.service.MessageQueryService.getMessageHistoryQueryHandle(..))")
-    public Object measureMessageHistory(ProceedingJoinPoint joinPoint) throws Throwable {
-        Timer.Sample sample = momoMetrics.startTimer();
-        try {
-            return joinPoint.proceed();
-        } finally {
-            momoMetrics.stopMessageHistoryTimer(sample);
-        }
-    }
+//    @Around("execution(* com.wanted.momocity.message.application.service.MessageQueryService.getMessageHistoryQueryHandle(..))")
+//    public Object measureMessageHistory(ProceedingJoinPoint joinPoint) throws Throwable {
+//        Timer.Sample sample = momoMetrics.startTimer();
+//        try {
+//            return joinPoint.proceed();
+//        } finally {
+//            momoMetrics.stopMessageHistoryTimer(sample);
+//        }
+//    }
 
     // 채팅방 목록 조회 소요 시간 측정
     // 기존 : 137ms, SQL 14개
-    @Around("execution(* com.wanted.momocity.message.application.service.MessageQueryService.getChatRoomQueryHandle(..))")
-    public Object measureChatRoomList(ProceedingJoinPoint joinPoint) throws Throwable {
-        Timer.Sample sample = momoMetrics.startTimer();
-        try {
-            return joinPoint.proceed();
-        } finally {
-            momoMetrics.stopChatRoomListTimer(sample);
-        }
-    }
+//    @Around("execution(* com.wanted.momocity.message.application.service.MessageQueryService.getChatRoomQueryHandle(..))")
+//    public Object measureChatRoomList(ProceedingJoinPoint joinPoint) throws Throwable {
+//        Timer.Sample sample = momoMetrics.startTimer();
+//        try {
+//            return joinPoint.proceed();
+//        } finally {
+//            momoMetrics.stopChatRoomListTimer(sample);
+//        }
+//    }
 
     // 친구 목록 조회 소요 시간 측정
     // 기존 : 93ms, SQL 10개, N+1 확인
-    @Around("execution(* com.wanted.momocity.friend.application.service.FriendQueryService.getFriendQueryHandle(..))")
-    public Object measureFriendList(ProceedingJoinPoint joinPoint) throws Throwable {
-        Timer.Sample sample = momoMetrics.startTimer();
-        try {
-            return joinPoint.proceed();
-        } finally {
-            momoMetrics.stopFriendListTimer(sample);
-        }
-    }
+//    @Around("execution(* com.wanted.momocity.friend.application.service.FriendQueryService.getFriendQueryHandle(..))")
+//    public Object measureFriendList(ProceedingJoinPoint joinPoint) throws Throwable {
+//        Timer.Sample sample = momoMetrics.startTimer();
+//        try {
+//            return joinPoint.proceed();
+//        } finally {
+//            momoMetrics.stopFriendListTimer(sample);
+//        }
+//    }
 
     // 강의 등록 소요 시간 측정
     @Around("execution(* com.wanted.momocity.lecture.application.service.LectureCommandService.createLecture(..))")
@@ -108,6 +108,53 @@ public class MetricsAop {
         } finally {
             momoMetrics.stopEnrollmentTimer(sample);
         }
+    }
+
+    // 로그인 소요 시간 측정
+    // AuthenticationManager 인증 + Redis 리프레시 토큰 저장 포함 전체 시간
+    @Around("execution(* com.wanted.momocity.auth.application.service.AuthCommandService.login(..))")
+    public Object measureAuthLogin(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try {
+            return joinPoint.proceed();
+        } finally {
+            momoMetrics.stopAuthLoginTimer(sample);
+        }
+    }
+
+    @Around("execution(* com.wanted.momocity.user.application.service.UserQueryService.userDetail(..))")
+    public Object measureUserDetail(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopUserDetailTimer(sample); }
+    }
+
+    @Around("execution(* com.wanted.momocity.user.application.service.UserCommandService.updateUserInfo(..))")
+    public Object measureUserUpdate(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopUserUpdateTimer(sample); }
+    }
+
+    @Around("execution(* com.wanted.momocity.user.application.service.UserQueryService.getApplicationList(..))")
+    public Object measureTeacherApplicationList(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopTeacherApplicationListTimer(sample); }
+    }
+
+    @Around("execution(* com.wanted.momocity.user.application.service.UserQueryService.getApplicationDetail(..))")
+    public Object measureTeacherApplicationDetail(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopTeacherApplicationDetailTimer(sample); }
+    }
+
+    @Around("execution(* com.wanted.momocity.user.application.service.UserQueryService.getAdminUserList(..))")
+    public Object measureAdminUserList(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopAdminUserListTimer(sample); }
     }
 
 }
