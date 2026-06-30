@@ -1,6 +1,7 @@
 package com.wanted.momocity.friend.application.service;
 
 
+import com.wanted.momocity.friend.application.metric.FriendMetrics;
 import com.wanted.momocity.friend.application.usecase.FindUserQueryUseCase;
 import com.wanted.momocity.friend.domain.repository.FriendRepository;
 import com.wanted.momocity.friend.enrollment.EnrollmentWithFMJpaEntity;
@@ -9,6 +10,7 @@ import com.wanted.momocity.friend.infrastructure.persistence.FriendSideEnrollmen
 
 import com.wanted.momocity.friend.lecture.LectureWithFMJpaEntity;
 import com.wanted.momocity.friend.user.UserWithFMJpaEntity;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,9 +28,13 @@ import java.util.stream.Collectors;
 public class FindUserQueryService implements FindUserQueryUseCase {
     private final FriendRepository friendRepository;
     private final FriendSideEnrollmentRepository friendSideEnrollmentRepository;
+    private final FriendMetrics friendMetrics;
 
     @Override
     public List<FindView> handle(Long userId, String findNickname) {
+        //시작 시점에 타이머 스타트!
+        Timer.Sample sample = io.micrometer.core.instrument.Timer.start();
+
         log.info("[FindUserQueryService] 사용자 검색 시작 - 요청자ID: {}, 검색 키워드: '{}'", userId, findNickname);
 
         //어댑터들로부터 가공되지 않은 순수 데이터 로드
@@ -99,6 +105,9 @@ public class FindUserQueryService implements FindUserQueryUseCase {
                     targetUser.getProfileImageUrl()
             ));
         }
+
+        //return 직전에 딱 멈추고 시간 기록하기!
+        sample.stop(friendMetrics.getUserSearchTimer());
 
         log.info("[FindUserQueryService] 사용자 검색 가공 완료 - 최종 반환 결과: {}개", result.size());
         return result;

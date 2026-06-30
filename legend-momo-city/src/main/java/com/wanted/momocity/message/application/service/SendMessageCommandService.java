@@ -5,6 +5,7 @@ import com.wanted.momocity.friend.infrastructure.persistence.FriendJpaEntity;
 import com.wanted.momocity.friend.user.UserWithFMJpaEntity;
 import com.wanted.momocity.global.domain.common.exception.DomainRuleViolationException;
 import com.wanted.momocity.message.application.manager.ChatRoomSessionManager;
+import com.wanted.momocity.message.application.metric.MessageMetrics;
 import com.wanted.momocity.message.application.policy.MessageEligibilityPolicy;
 import com.wanted.momocity.message.application.usecase.SendMessageCommandUseCase;
 import com.wanted.momocity.message.domain.event.SendMessagePublishedEvent;
@@ -39,6 +40,7 @@ public class SendMessageCommandService implements SendMessageCommandUseCase {
     private final ChatRoomSessionManager sessionManager;
     //웹소켓 브로드캐스팅 템플릿 주입
     private final SimpMessagingTemplate messagingTemplate;
+    private final MessageMetrics messageMetrics;
 
     //메시지 전송
     @Override
@@ -90,6 +92,9 @@ public class SendMessageCommandService implements SendMessageCommandUseCase {
 
         MessageJpaEntity newMessage = MessageJpaEntity.createNewMessage(chatRoom, sender, content, isRead);
         messageRepository.saveMessage(newMessage);
+
+        // 🎯 딱 한 줄: 메시지가 성공적으로 적재 및 유효 통과 시점에 글로벌 TPS 카운트 증가
+        messageMetrics.incrementMessageSendCount();
 
         //실시간 웹소켓 전송(프론트엔트가 구독 중인 주소로 메시지 주머니 투척)
         WebSocketMessageDto wsPayload = new WebSocketMessageDto(

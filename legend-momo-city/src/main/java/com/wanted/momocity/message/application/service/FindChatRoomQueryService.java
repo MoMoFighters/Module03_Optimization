@@ -8,12 +8,14 @@ import com.wanted.momocity.friend.lecture.LectureWithFMJpaEntity;
 import com.wanted.momocity.friend.user.UserWithFMJpaEntity;
 import com.wanted.momocity.global.domain.common.exception.DomainRuleViolationException;
 
+import com.wanted.momocity.message.application.metric.MessageMetrics;
 import com.wanted.momocity.message.application.policy.MessageEligibilityPolicy;
 import com.wanted.momocity.message.application.usecase.FindChatRoomQueryUseCase;
 import com.wanted.momocity.message.domain.repository.ChatRoomQueryProjection;
 import com.wanted.momocity.message.domain.repository.MessageRepository;
 import com.wanted.momocity.message.infrastructure.persistence.*;
 
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,11 +40,15 @@ public class FindChatRoomQueryService implements FindChatRoomQueryUseCase {
     //정책 주입
     private final MessageEligibilityPolicy messageEligibilityPolicy;
     private final SpringDataMessageRepository springDataMessageRepository;
+    private final MessageMetrics messageMetrics;
 
     //채팅 목록
     @Override
     public List<ChatRoomView> handle(Long userId) {
         log.info("[FindChatRoomQueryService] 채팅방 목록 조회 비즈니스 가공 시작 - 조회 요청 유저ID: {}", userId);
+
+        // 🎯 1. 시작 한 줄: 타이머 측정 시작!
+        Timer.Sample sample = io.micrometer.core.instrument.Timer.start();
 
         //현재 로그인한 유저 정보 확인(학생/강사 판별)
         UserWithFMJpaEntity loginUser = messageSideUserRepository.findById(userId)
@@ -202,6 +208,8 @@ public class FindChatRoomQueryService implements FindChatRoomQueryUseCase {
                     targetUser != null ? targetUser.getProfileImageUrl() : null
             ));
         }
+        // 🎯 2. 끝 한 줄: 루프 가공이 완전히 끝나고 리턴 직전에 타이머 기록 후 멈춤!
+        sample.stop(messageMetrics.getChatRoomListTimer());
 
         log.info("[FindChatRoomQueryService] 채팅 목록 최종 가공 완료. 노출할 채팅방 수: {}개", result.size());
         return result;

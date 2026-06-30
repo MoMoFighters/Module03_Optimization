@@ -8,11 +8,13 @@ import com.wanted.momocity.friend.infrastructure.persistence.FriendJpaEntity;
 
 import com.wanted.momocity.friend.lecture.LectureWithFMJpaEntity;
 import com.wanted.momocity.friend.user.UserWithFMJpaEntity;
+import com.wanted.momocity.message.application.metric.MessageMetrics;
 import com.wanted.momocity.message.application.policy.MessageEligibilityPolicy;
 import com.wanted.momocity.message.application.usecase.GetMessageHistoryQueryUseCase;
 import com.wanted.momocity.message.domain.repository.MessageRepository;
 import com.wanted.momocity.message.infrastructure.persistence.*;
 
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -39,10 +41,13 @@ public class GetMessageHistoryQueryService implements GetMessageHistoryQueryUseC
     private final SpringDataChatRoomMemberRepository springDataChatRoomMemberRepository;
     private final SpringDataMessageRepository springDataMessageRepository;
     private final SpringDataChatRoomRepository springDataChatRoomRepository;
+    private final MessageMetrics messageMetrics;
 
     //메시지 내역 조회
     @Override
     public List<MessageHistoryView> handle(Long roomId, Long userId, Long lastMessageId) {
+        Timer.Sample sample = io.micrometer.core.instrument.Timer.start();
+
         log.info("[GetMessageHistoryQueryService] 내역 조회 시작 - 유저: {}, 방: {}, 커서ID: {}", userId, roomId, lastMessageId);
 
         // 1. 유저 정보 및 권한 확인
@@ -223,6 +228,9 @@ public class GetMessageHistoryQueryService implements GetMessageHistoryQueryUseC
                     notMeRole
             ));
         }
+
+        // 🎯 끝 한 줄: 리턴 직전에 타이머를 멈추고 메트릭에 기록!
+        sample.stop(messageMetrics.getMessageHistoryTimer());
 
         return viewList;
     }
