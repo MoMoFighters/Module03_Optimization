@@ -18,6 +18,9 @@ public class LectureMetricsAop {
     private static final String SUCCESS = "success";
     private static final String FAILURE = "failure";
     private static final String NONE = "none";
+    private static final String STUDENT = "student";
+    private static final String TEACHER = "teacher";
+    private static final String ADMIN = "admin";
 
     private final MeterRegistry meterRegistry;
 
@@ -26,6 +29,7 @@ public class LectureMetricsAop {
         Timer.Sample sample = Timer.start(meterRegistry);
         String service = joinPoint.getSignature().getDeclaringType().getSimpleName();
         String method = ((MethodSignature) joinPoint.getSignature()).getMethod().getName();
+        String viewer = resolveViewer(service, method);
         String outcome = SUCCESS;
         String exception = NONE;
 
@@ -36,20 +40,40 @@ public class LectureMetricsAop {
             exception = throwable.getClass().getSimpleName();
             throw throwable;
         } finally {
-            record(sample, service, method, outcome, exception);
+            record(sample, service, method, viewer, outcome, exception);
         }
+    }
+
+    private String resolveViewer(String service, String method) {
+        if ("LectureQueryService".equals(service)) {
+            if ("getLectures".equals(method) || "getStudentLectureDetail".equals(method)) {
+                return STUDENT;
+            }
+
+            if ("getTeacherLectures".equals(method) || "getTeacherLectureDetail".equals(method)) {
+                return TEACHER;
+            }
+        }
+
+        if ("AdminLectureQueryService".equals(service)) {
+            return ADMIN;
+        }
+
+        return NONE;
     }
 
     private void record(
             Timer.Sample sample,
             String service,
             String method,
+            String viewer,
             String outcome,
             String exception
     ) {
         String[] tags = {
                 "service", service,
                 "method", method,
+                "viewer", viewer,
                 "outcome", outcome,
                 "exception", exception
         };
