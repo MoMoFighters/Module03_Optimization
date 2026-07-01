@@ -40,6 +40,8 @@ public class ViewingMetrics {
 
         this.saveProgressTimer = Timer.builder("momocity.viewing.save.progress.time")
                 .description("진척도 저장 처리 시간 - 가장 빈번한 로직 성능 측정")
+                // p95/p99 확인용 (after 비교)
+                .publishPercentiles(0.95, 0.99)
                 .register(meterRegistry);
 
         this.s3PresignedUrlTimer = Timer.builder("momocity.viewing.s3.presigned.url.time")
