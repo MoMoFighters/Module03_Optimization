@@ -157,4 +157,41 @@ public class MetricsAop {
         finally { momoMetrics.stopAdminUserListTimer(sample); }
     }
 
+    /* comment. Admin 대시보드 : 크로스 BC 쿼리 5회 — 핵심 병목 측정 */
+    @Around("execution(* com.wanted.momocity.admin.application.service.AdminDashboardQueryService.getDashboardSummary(..))")
+    public Object measureAdminDashboard(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopAdminDashboardTimer(sample); }
+    }
+
+    /* comment. Admin 에러로그 : 단순 조회, 베이스라인 측정용 */
+    @Around("execution(* com.wanted.momocity.admin.application.service.ErrorLogQueryService.getRecent(..))")
+    public Object measureAdminErrorLogQuery(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopAdminErrorLogQueryTimer(sample); }
+    }
+
+    /* comment. 신고 접수 : Timer 는 항상, Counter 는 성공 시에만 increment */
+    @Around("execution(* com.wanted.momocity.report.application.service.ReportCommandService.submitReport(..))")
+    public Object measureReportSubmit(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try {
+            Object result = joinPoint.proceed();
+            momoMetrics.incrementReportSubmitCounter();
+            return result;
+        } finally {
+            momoMetrics.stopReportSubmitTimer(sample);
+        }
+    }
+
+    /* comment. 신고 조회 : getRecent / getByStatus 양쪽 커버 */
+    @Around("execution(* com.wanted.momocity.report.application.service.ReportQueryService.*(..))")
+    public Object measureReportQuery(ProceedingJoinPoint joinPoint) throws Throwable {
+        Timer.Sample sample = momoMetrics.startTimer();
+        try { return joinPoint.proceed(); }
+        finally { momoMetrics.stopReportQueryTimer(sample); }
+    }
+
 }

@@ -27,6 +27,18 @@ public class MomoMetrics {
     private final Timer adminUserListTimer;
 
 
+    // ===== Admin BC =====
+    /* comment. 대시보드 : 외부 BC 3개 × DB쿼리 5회 크로스호출 — 병목 측정 핵심 */
+    private final Timer adminDashboardTimer;
+    /* comment. 에러로그 : admin 자체 도메인 단순조회, 베이스라인 측정용 */
+    private final Timer adminErrorLogQueryTimer;
+
+    // ===== Report BC =====
+    /* comment. 신고 접수 소요시간 + 성공 횟수 카운터 (성공 시에만 increment) */
+    private final Timer reportSubmitTimer;
+    private final Timer reportQueryTimer;
+    private final Counter reportSubmitCounter;
+
     // ===== Counter =====
     private final Counter s3UploadFailCounter;
 
@@ -114,6 +126,28 @@ public class MomoMetrics {
         this.adminUserListTimer = Timer.builder("momocity.admin.user.list.duration")
                 .description("관리자 회원 목록 조회 소요 시간 - Redis 캐싱 전후 비교")
                 .register(meterRegistry);
+
+        // Admin BC
+        this.adminDashboardTimer = Timer.builder("momocity.admin.dashboard.duration")
+                .description("대시보드 요약 조회 소요 시간 - 크로스 BC 쿼리 5회")
+                .register(meterRegistry);
+
+        this.adminErrorLogQueryTimer = Timer.builder("momocity.admin.errorlog.query.duration")
+                .description("에러로그 최근 조회 소요 시간")
+                .register(meterRegistry);
+
+        // Report BC
+        this.reportSubmitTimer = Timer.builder("momocity.report.submit.duration")
+                .description("신고 접수 소요 시간")
+                .register(meterRegistry);
+
+        this.reportQueryTimer = Timer.builder("momocity.report.query.duration")
+                .description("신고 조회 소요 시간 - getRecent / getByStatus 공용")
+                .register(meterRegistry);
+
+        this.reportSubmitCounter = Counter.builder("momocity.report.submit.total")
+                .description("신고 접수 성공 횟수")
+                .register(meterRegistry);
     }
 
     // 작업 시작 시점의 시간을 기억
@@ -183,4 +217,17 @@ public class MomoMetrics {
     public void stopTeacherApplicationDetailTimer(Timer.Sample sample) { sample.stop(teacherApplicationDetailTimer); }
 
     public void stopAdminUserListTimer(Timer.Sample sample) { sample.stop(adminUserListTimer); }
+
+    // Admin BC
+    public void stopAdminDashboardTimer(Timer.Sample sample) { sample.stop(adminDashboardTimer); }
+
+    public void stopAdminErrorLogQueryTimer(Timer.Sample sample) { sample.stop(adminErrorLogQueryTimer); }
+
+    // Report BC
+    public void stopReportSubmitTimer(Timer.Sample sample) { sample.stop(reportSubmitTimer); }
+
+    public void stopReportQueryTimer(Timer.Sample sample) { sample.stop(reportQueryTimer); }
+
+    /* comment. 성공 시에만 호출 — proceed() 후 finally 전에 increment 해서 실패는 카운트 제외 */
+    public void incrementReportSubmitCounter() { reportSubmitCounter.increment(); }
 }
