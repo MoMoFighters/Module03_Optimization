@@ -8,6 +8,7 @@ import com.wanted.momocity.lecture.infrastructure.persistence.ChapterJpaEntity;
 import com.wanted.momocity.lecture.infrastructure.persistence.SpringDataChapterRepository;
 import com.wanted.momocity.viewing.application.port.ChapterPort;
 import com.wanted.momocity.viewing.domain.model.Chapter;
+import com.wanted.momocity.viewing.infrastructure.metrics.ViewingMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -61,6 +62,7 @@ public class ChapterCatalogAdapter implements ChapterPort {
     private final SpringDataChapterRepository springDataChapterRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final ViewingMetrics viewingMetrics;
 
     /*
      * comment.
@@ -73,16 +75,35 @@ public class ChapterCatalogAdapter implements ChapterPort {
      */
 
     @Override
-    @Cacheable(value = "chapter", key = "#chapterId")
     public Chapter findById(Long chapterId) {
 
-        // SpringDataChapterRepository 의 findById() 로 DB 조회
-        // 없으면 DomainRuleViolationException 발생
-        ChapterJpaEntity entity = springDataChapterRepository.
-                findById(chapterId)
+        String cacheKey = "chapter::" + chapterId;
+
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                viewingMetrics.recordCacheHit();
+                return objectMapper.convertValue(cached, Chapter.class);
+            }
+            viewingMetrics.recordCacheMiss();
+        } catch (Exception e) {
+            log.warn("[Viewing] chapter 캐시 조회 실패 | chapterId={}", chapterId);
+        }
+
+        ChapterJpaEntity entity = springDataChapterRepository
+                .findById(chapterId)
                 .orElseThrow(() -> new DomainRuleViolationException("챕터를 찾을 수 없습니다."));
-        // ChapterJpaEntity -> chapter 도메인으로 변환
-        return toChapter(entity);
+
+        Chapter chapter = toChapter(entity);
+
+        try {
+            redisTemplate.opsForValue().set(cacheKey, chapter, Duration.ofHours(1));
+        } catch (Exception e) {
+            log.warn("[Viewing] chapter 캐시 저장 실패 | chapterId={}", chapterId);
+        }
+
+        return chapter;
+
     }
 
     /*
@@ -106,6 +127,7 @@ public class ChapterCatalogAdapter implements ChapterPort {
             // Redis 에서 캐시 조회
             Object cached = redisTemplate.opsForValue().get(cacheKey);
             if (cached != null) {
+                viewingMetrics.recordCacheHit();
                 // TypeReference 로 List<Chapter> 정확히 변환
                 List<Chapter> chapters = objectMapper.convertValue(
                         cached,
@@ -114,6 +136,7 @@ public class ChapterCatalogAdapter implements ChapterPort {
                 log.debug("[Viewing] chapters 캐시 히트 | lectureId={}", lectureId);
                 return chapters;
             }
+            viewingMetrics.recordCacheMiss();
         } catch (Exception e) {
             log.warn("[Viewing] chapters 캐시 조회 실패, DB 조회로 fallback | lectureId={}", lectureId);
         }

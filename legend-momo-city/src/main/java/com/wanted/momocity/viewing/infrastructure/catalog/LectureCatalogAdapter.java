@@ -1,14 +1,21 @@
 package com.wanted.momocity.viewing.infrastructure.catalog;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wanted.momocity.auth.application.port.LoadUserPort;
 import com.wanted.momocity.global.domain.common.exception.DomainRuleViolationException;
 import com.wanted.momocity.lecture.infrastructure.persistence.LectureJpaEntity;
 import com.wanted.momocity.lecture.infrastructure.persistence.SpringDataLectureRepository;
 import com.wanted.momocity.viewing.application.port.LecturePort;
 import com.wanted.momocity.viewing.domain.model.Lecture;
+import com.wanted.momocity.viewing.infrastructure.metrics.ViewingMetrics;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+
+import static reactor.netty.http.HttpConnectionLiveness.log;
 
 /*
 * comment.
@@ -37,6 +44,9 @@ public class LectureCatalogAdapter implements LecturePort {
     // LoadUserPort 주입
     // → teacherId 로 강사 이름 조회할 때 사용
     private final LoadUserPort loadUserPort;
+    private final RedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final ViewingMetrics viewingMetrics;
 
     /*
      * comment.
@@ -48,23 +58,29 @@ public class LectureCatalogAdapter implements LecturePort {
      */
 
     @Override
-    @Cacheable(value = "lecture", key = "#lectureId")
     public Lecture findById(Long lectureId) {
 
-        // SpringDataLectureRepository 의 findById() 로 강의 DB 조회
+        String cacheKey = "lecture::" + lectureId;
+
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                viewingMetrics.recordCacheHit();
+                return objectMapper.convertValue(cached, Lecture.class);
+            }
+            viewingMetrics.recordCacheMiss();
+        } catch (Exception e) {
+            log.warn("[Viewing] lecture 캐시 조회 실패 | lectureId={}", lectureId);
+        }
+
         LectureJpaEntity entity = springDataLectureRepository.findById(lectureId)
                 .orElseThrow(() -> new DomainRuleViolationException("강의를 찾을 수 없습니다."));
 
-        // LoadUserPort 로 강사 이름 조회
-        // → LectureJpaEntity 에 instructorName 없어서 LoadUserPort 통해 teacherId 로 user 이름 조회
-        // → 없으면 "강사" 로 기본값 처리
         String instructorName = loadUserPort.findById(entity.getTeacherId())
                 .map(user -> user.getName())
                 .orElse("강사");
 
-        // LectureJpaEntity → Lecture 도메인으로 변환
-        // category 는 Enum → String 변환
-        return Lecture.reconstitute(
+        Lecture lecture = Lecture.reconstitute(
                 entity.getId(),
                 entity.getTeacherId(),
                 entity.getTitle(),
@@ -73,5 +89,14 @@ public class LectureCatalogAdapter implements LecturePort {
                 instructorName,
                 entity.getStatus().name()
         );
+
+        try {
+            redisTemplate.opsForValue().set(cacheKey, lecture, Duration.ofHours(1));
+        } catch (Exception e) {
+            log.warn("[Viewing] lecture 캐시 저장 실패 | lectureId={}", lectureId);
+        }
+
+        return lecture;
     }
+
 }
