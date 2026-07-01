@@ -54,7 +54,8 @@ class ViewingCommandServiceTest {
                 chapterPort,
                 learningHistoryRepository,
                 eventPublisher,
-                enrollmentAccessPolicy
+                enrollmentAccessPolicy,
+                mock(com.wanted.momocity.viewing.infrastructure.metrics.ViewingMetrics.class)
         );
     }
 
